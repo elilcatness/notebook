@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QMouseEvent, QBrush, QColor
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QWidget, QDialog, QListWidgetItem
 
 from .category import Category
@@ -54,6 +54,7 @@ class CategoriesForm(QWidget, CategoriesFormUi):
         self.create_btn.clicked.connect(self.add_category)
         self.edit_btn.clicked.connect(self.edit_category)
         self.delete_btn.clicked.connect(self.delete_category)
+        self.search_field.textChanged.connect(self.search)
         self.fill_categories()
 
         self.dialog = None
@@ -62,6 +63,16 @@ class CategoriesForm(QWidget, CategoriesFormUi):
         while self.listWidget.takeItem(0):
             pass
         self.listWidget.addItems([cat.name for cat in self.parent.session.query(Category).all()])
+
+    def search(self, text):
+        self.listWidget.clear()
+        if text:
+            categories = []
+            for cat in self.parent.session.query(Category).all():
+                if cat.name.lower().startswith(text.lower()):
+                    self.listWidget.addItem(cat.name)
+        else:
+            self.fill_categories()
 
     def add_category(self):
         self.status.setText('')

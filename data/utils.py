@@ -2,8 +2,11 @@ import datetime as dt
 import os
 
 from PyQt5.QtCore import Qt, QEvent
-from PyQt5.QtGui import QPalette, QFontMetrics, QStandardItem, QKeyEvent
-from PyQt5.QtWidgets import QMainWindow, QTextEdit, QComboBox, QStyledItemDelegate, qApp
+from PyQt5.QtGui import QPalette, QFontMetrics, QStandardItem
+from PyQt5.QtWidgets import QMainWindow, QTextEdit, QComboBox, QStyledItemDelegate, qApp, QWidget
+
+from data.baseApplicationForm import BaseApplicationForm
+from data.category import Category
 
 if os.getcwd().split('\\')[-1] != 'data':
     from data.exceptions import InvalidDateFormat
@@ -151,3 +154,22 @@ class CheckableComboBox(QComboBox):
             if self.model().item(i).checkState() == Qt.Checked:
                 res.append(self.model().item(i).data())
         return res
+
+
+class AddDialog(QWidget, BaseApplicationForm):
+    def __init__(self, parent):
+        super().__init__()
+        self.setupUi(self)
+
+        self.parent = parent
+
+        categories = self.parent.session.query(Category).all()
+        for category in categories:
+            self.cat_value.addItem(category.name)
+
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.destroy)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key_Return:
+            return self.accept()

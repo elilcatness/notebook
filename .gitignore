@@ -1,2 +1,2 @@
-db_data.txt
-venv/
+.idea/
+data/db_data.txt

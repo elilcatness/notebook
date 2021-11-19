@@ -1,8 +1,8 @@
 import os
 
 from PyQt5.QtCore import QRect
-from PyQt5.QtWidgets import QWidget
 from PyQt5.QtGui import QKeyEvent
+from PyQt5.QtWidgets import QWidget
 
 from data.profile import Profile
 from data.user import User

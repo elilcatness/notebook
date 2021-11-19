@@ -1,9 +1,9 @@
 import datetime as dt
 import os
 from typing import Union
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Table, orm
 
 from PyQt5.QtWidgets import QTextEdit
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Table, orm
 from sqlalchemy.orm import Session
 
 if os.getcwd().split('\\')[-1] != 'data':
@@ -12,7 +12,6 @@ if os.getcwd().split('\\')[-1] != 'data':
 else:
     from baseField import BaseField
     from db_session import DbBase
-
 
 category_to_task = Table('category_to_task', DbBase.metadata,
                          Column('category', Integer, ForeignKey('categories.id')),

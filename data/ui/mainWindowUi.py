@@ -4,6 +4,19 @@ from PyQt5.QtWidgets import (QWidget, QListWidget, QCalendarWidget, QMenuBar, QM
                              QToolButton, QStatusBar, QFontComboBox, QLineEdit)
 
 
+# class CalendarWidget(QCalendarWidget):
+#     def __init__(self, *args, **kwargs):
+#         super(CalendarWidget, self).__init__(*args, **kwargs)
+#         self.last_click_date = None
+#
+#     def selec(self, event: QMouseEvent) -> None:
+#         date = self.selectedDate().toPyDate()
+#         if date == self.last_click_date:
+#             self.last_click_date = None
+#             print(date)
+#             print(self.parent().__class__.__name__)
+
+
 class Ui_MainWindow:  # No comments
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
@@ -16,17 +29,18 @@ class Ui_MainWindow:  # No comments
         self.centralwidget.setAutoFillBackground(False)
         self.centralwidget.setObjectName("centralwidget")
         self.listWidget = QListWidget(self.centralwidget)
-        self.listWidget.setGeometry(QRect(10, 70, 256, 361))
+        self.listWidget.setGeometry(QRect(10, 118, 256, 361))
         self.listWidget.setObjectName("listWidget")
+        # self.calendarWidget = CalendarWidget(self.centralwidget)
         self.calendarWidget = QCalendarWidget(self.centralwidget)
         self.calendarWidget.setGeometry(QRect(310, 70, 600, 361))
         self.calendarWidget.setObjectName("calendarWidget")
         self.listWidget.raise_()
         self.listWidget.setStyleSheet("border: 1px solid;border-radius: 3px;")
         self.calendarWidget.raise_()
-        # self.search_field = QLineEdit(self.listWidget)
-        # self.search_field.setGeometry(QRect(0, 0, 70, 100))
-        # self.search_field.setPlaceholderText('Введите запрос для поиска')
+        self.search_field = QLineEdit(self.centralwidget)
+        self.search_field.setGeometry(QRect(self.listWidget.pos().x(), 80, self.listWidget.width() + 12, 30))
+        self.search_field.setPlaceholderText('Введите запрос для поиска')
         MainWindow.setCentralWidget(self.centralwidget)
 
         self.combo_shift = QFontComboBox(self.centralwidget)
@@ -254,7 +268,7 @@ class Ui_MainWindow:  # No comments
         self.delete_action.setText(_translate("MainWindow", "Удалить заметку"))
         self.save_action.setText(_translate("MainWindow", "Сохранить"))
         self.insert_image_action.setText(_translate("MainWindow", "Вставить картинку"))
-        self.show_all_action.setText(_translate("MainWindow", "Показать все"))
+        self.show_all_action.setText(_translate("MainWindow", "Сброс поиска и фильтра по дате"))
         self.add_task_action.setText(_translate("MainWindow", "Создать задачу"))
         self.delete_task_action.setText(_translate("MainWindow", "Удалить задачу"))
         self.close_task_action.setText(_translate("MainWindow", "Отметить задачу выполненной"))

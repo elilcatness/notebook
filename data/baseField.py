@@ -8,9 +8,7 @@ from sqlalchemy.orm import Session
 
 if os.getcwd().split('\\')[-1] != 'data':
     from data.utils import DateFunctions
-    from data import db_session
 else:
-    import db_session
     from utils import DateFunctions
 
 
@@ -82,8 +80,10 @@ class BaseField(DateFunctions):  # Основной класс, от котор�
     def get_title(self) -> str:  # Возвращает название объекта
         return self.title
 
-    def get_date_dt(self) -> dt.date:  # Возвращает дату создания в виде строки
-        return self.date
+    def get_date_dt(self, with_time=True) -> dt.date:  # Возвращает дату создания в виде строки
+        if with_time:
+            return self.date
+        return dt.date(self.date.year, self.date.month, self.date.day)
 
     def get_date_str(self) -> str:  # Возвращает дату без времени в виде объекта datetime
         return self.convert_dt_to_str(self.date)

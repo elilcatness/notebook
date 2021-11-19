@@ -1,21 +1,24 @@
 import datetime as dt
+import os.path
 import sys
-
 from typing import Union
 
 from PyQt5 import QtCore, QtWidgets, QtGui
+from sqlalchemy.orm import Session
 
 from data import db_session
 from data.baseApplicationForm import BaseApplicationForm
+from data.categories import CategoriesForm, CategoriesObjForm
+from data.category import Category
 from data.exceptions import InvalidDateFormat
 from data.login import LoginForm
-from data.categories import CategoriesForm, CategoriesObjForm
 from data.note import Note
 from data.profile import Profile
 from data.task import Task
 from data.ui.mainWindowUi import Ui_MainWindow
+from data.ui.noteAddUi import NoteAddDialog
+from data.ui.taskAddUi import TaskAddDialog
 from data.utils import DateFunctions, FocusGradedText
-from sqlalchemy.orm import Session
 
 
 class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunctions):
@@ -25,7 +28,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
         self.hide()  # Скрытие основного окна до прохода авторизации
         self.text = None  # Обозначение атрибута поля для ввода текста
         list_widget_position = self.listWidget.pos()  # Текущая позиция списка для размещения кнопок секций
-        self.note_tool.move(list_widget_position.x(), list_widget_position.y() - 31)  # Размещение кнопок секций
+        self.note_tool.move(list_widget_position.x(),
+                            self.calendarWidget.pos().y() - self.note_tool.height())  # Размещение кнопок секций
         self.hide_tools()  # Скрытие кнопок форматирования, так как первый виджет после входа - календарь
 
         self.setMinimumSize(1100, 730)  # Обозначение минимального размера окна для корректного масштабирования
@@ -39,12 +43,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
 
         self.add_action.triggered.connect(self.add_object)  # Привязка сигнала к функции создания заметки
         self.delete_action.triggered.connect(self.delete_object)  # Привязка сигнала к функции удаления заметки
-        self.add_task_action.triggered.connect(self.add_task_deadline)  # Привязка сигнала к функции создания задачи
+        self.add_task_action.triggered.connect(self.add_object)  # Привязка сигнала к функции создания задачи
         self.delete_task_action.triggered.connect(self.delete_object)  # Привязка сигнала к функции удаления задачи
         self.close_task_action.triggered.connect(self.close_task)  # Привязка сигнала к функции выполнения задачи
         self.save_action.triggered.connect(self.save_object)  # Привязка сигнала к функции сохранения объекта
         self.insert_image_action.triggered.connect(self.insert_image)  # Привязка сигнала к функции вставки изображения
-        self.show_all_action.triggered.connect(self.open_date_objects)  # Привязка сигнала к функции отключения фильтра
+        self.show_all_action.triggered.connect(self.search)  # Привязка сигнала к функции отключения фильтра
         self.category_action.triggered.connect(self.handle_categories)
         self.handle_categories_action.triggered.connect(self.handle_object_categories)
         self.format_bold.triggered.connect(lambda x: self.formatting("make_bold"))  # Далее - функции форматирования
@@ -81,11 +85,13 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
 
         self.listWidget.itemClicked.connect(self.load_object)  # Привязка нажатия на объект списка к функции загрузки
         self.listWidget.itemDoubleClicked.connect(self.edit_object_title)  # Привязь двойного клика к редактору названия
-        self.calendarWidget.selectionChanged.connect(self.open_date_objects)  # Привязка изменения выделенной даты
+        self.calendarWidget.selectionChanged.connect(self.add_object)  # Привязка изменения выделенной даты
         # к обработчику
 
         self.note_tool.clicked.connect(self.change_section)  # Привязка смены секции на заметки к обработчику
         self.task_tool.clicked.connect(self.change_section)  # Привязка смены секции на задачи к обработчику
+
+        self.search_field.textChanged.connect(self.search)
 
         self.inner_change = False  # Определение внутренней переменной для игнорирования сигнала
         # об изменении текста поля при подгрузке текста объекта из БД
@@ -99,26 +105,48 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
                                   'text-decoration: underline', 'text-decoration: overline',
                                   'text-decoration: line-through']  # Стандартные значения для инструментов
 
-    def open_date_objects(self) -> None:  # Обработчик фильтрации списка объектов активной секции по выбранной дате
-        date = self.calendarWidget.selectedDate().toPyDate()
+        self.dialog = None  # Диалог создания заметки или задачи
+
+    def search(self, text: str, from_date_refresh=False):
         self.listWidget.clear()
-        if self.sender() == self.calendarWidget:  # Проверка на то, была ли вызвана функция путём нажатия на дату
-            self.load_objects(no_list=True)  # Вызов загрузки объектов для получения неотфильтрованных объектов,
-            # но без отображения оных в списке, так как дальше идёт в функции идёт выборка
+        if text and self.sender() != self.show_all_action:
+            if not from_date_refresh:
+                self.load_objects(no_list=True)
             if self.active_section == 'notes':
-                self.notes = list(filter(lambda x: x.get_date_dt() == date, self.notes))
+                self.notes = list(filter(lambda x: x.get_title().lower().startswith(text.lower()), self.notes))
                 self.listWidget.addItems([x.get_title() for x in self.notes])
             else:
-                self.tasks = list(filter(lambda x: x.get_deadline_dt(with_time=False) == date,
-                                         self.tasks))
+                self.tasks = list(filter(lambda x: x.get_title().lower().startswith(text.lower()), self.tasks))
                 self.listWidget.addItems([x.get_title() for x in self.tasks])
-                self.repaint_task_list()  # Вызов разметки выполненных и просроченных задач
         else:
             show_tasks = False if self.active_section == 'notes' else True
             self.load_objects(show_tasks=show_tasks)  # Здесь выбирается, что нужно отобразить именно задачи
             section = self.notes if self.active_section == 'notes' else self.tasks
             if section:  # Дополнительная проверка для корректного отображения после изменения темы
                 self.listWidget.item(0).setSelected(True)
+
+    # def open_date_objects(self) -> None:  # Обработчик фильтрации списка объектов активной секции по выбранной дате
+    #     date = self.calendarWidget.selectedDate().toPyDate()
+    #     self.listWidget.clear()
+    #     if self.sender() == self.calendarWidget:  # Проверка на то, была ли вызвана функция путём нажатия на дату
+    #         self.load_objects(no_list=True)  # Вызов загрузки объектов для получения неотфильтрованных объектов,
+    #         # но без отображения оных в списке, так как дальше в функции идёт выборка
+    #         if self.active_section == 'notes':
+    #             self.notes = list(filter(lambda x: x.get_date_dt(with_time=False) == date, self.notes))
+    #             self.listWidget.addItems([x.get_title() for x in self.notes])
+    #         else:
+    #             self.tasks = list(filter(lambda x: x.get_deadline_dt(with_time=False) == date,
+    #                                      self.tasks))
+    #             self.listWidget.addItems([x.get_title() for x in self.tasks])
+    #             self.repaint_task_list()  # Вызов разметки выполненных и просроченных задач
+    #         self.search(self.search_field.text(), from_date_refresh=True)
+    #     else:
+    #         self.search_field.setText('')
+    #         show_tasks = False if self.active_section == 'notes' else True
+    #         self.load_objects(show_tasks=show_tasks)  # Здесь выбирается, что нужно отобразить именно задачи
+    #         section = self.notes if self.active_section == 'notes' else self.tasks
+    #         if section:  # Дополнительная проверка для корректного отображения после изменения темы
+    #             self.listWidget.item(0).setSelected(True)
 
     def handle_categories(self):  # Функция, позволяющая настраивать все категории
         self.category_form = CategoriesForm(self)
@@ -214,7 +242,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.repaint_task_list()
         if self.show_calendar:
             self.repaint_calendar()
-            self.calendarWidget.setSelectedDate(dt.date.today())
+            # self.calendarWidget.setSelectedDate(dt.date.today())
 
     def insert_image(self) -> None:  # Обработчик вставки изображения в поле для ввода текста
         if not self.active_object or self.calendarWidget.isVisible():
@@ -234,7 +262,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
         if self.active_section == 'tasks':
             self.repaint_task_list()
         if (not self.purple.isChecked() and not self.green.isChecked()
-                and not self.blue.isChecked()) or self.sender().text() == 'Белый':
+            and not self.blue.isChecked()) or self.sender().text() == 'Белый':
             self.user.profile.set_preferred_theme('Белый', self.session)
             self.current_theme = 'Белый'
             self.green.setChecked(False)
@@ -244,6 +272,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.menubar.setStyleSheet('')
             self.calendarWidget.setStyleSheet('')
             self.setStyleSheet('')
+            self.search_field.setStyleSheet('')
             self.listWidget.setStyleSheet('border: 1px solid;border-radius: 3px;')
         elif self.sender().text() == 'Фиолетовый':
             self.current_theme = 'Фиолетовый'
@@ -258,6 +287,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.setStyleSheet('background-color:"#fff7ff"')
             self.listWidget.setStyleSheet('background-color:"#ffffff";border: 1px solid;'
                                           'border-radius: 3px;')
+            self.search_field.setStyleSheet('background-color:"#ffffff"')
         elif self.sender().text() == 'Зелёный':
             self.current_theme = 'Зелёный'
             self.user.profile.set_preferred_theme('Зелёный', self.session)
@@ -270,6 +300,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.setStyleSheet('background-color:"#d7ffd9"')
             self.listWidget.setStyleSheet('background-color:"#ffffff";border: 1px solid;'
                                           'border-radius: 3px;')
+            self.search_field.setStyleSheet('background-color:"#ffffff"')
         elif self.sender().text() == 'Голубой':
             self.current_theme = 'Голубой'
             self.user.profile.set_preferred_theme('Голубой', self.session)
@@ -281,6 +312,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.setStyleSheet('background-color:"#9be7ff"')
             self.listWidget.setStyleSheet('background-color:"#ffffff"; border: 1px solid;'
                                           'border-radius: 3px;')
+            self.search_field.setStyleSheet('background-color:"#ffffff"')
         self.bold_tool.setStyleSheet('font-weight:bold;background: #ffffff')
         self.italic_tool.setStyleSheet('font-style: italic;background: #ffffff')
         self.underline_tool.setStyleSheet('text-decoration: underline;background: #ffffff')
@@ -457,10 +489,12 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.combo_shift.show()
             title, date = self.active_object.get_title(), self.active_object.get_date_str()
             categories = ', '.join([cat.name for cat in self.active_object.categories])
-            status = ('%s. Дата создания: %s. Категории: %s' % (title, date, categories)
+            status = ('%s. Дата создания: %s.%s' % (title, date,
+                                                    (' Категории: %s' % categories) if categories else '')
                       if self.active_section == 'notes'
-                      else '%s. Дата создания: %s. Дедлайн: %s. Категории %s'
-                           % (title, date, obj.get_deadline_str(), categories))
+                      else '%s. Дата создания: %s. Дедлайн: %s.%s'
+                           % (title, date, obj.get_deadline_str(),
+                              (' Категории: %s' % categories) if categories else ''))
             self.status_bar.showMessage(status)
         else:
             obj.change_open(False)
@@ -566,24 +600,80 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.status_bar.showMessage('%s должна быть открыта' % field_name)
 
     def add_object(self) -> None:  # Добавляет новый объект в список
+        deadline_date = (self.calendarWidget.selectedDate().toPyDate().strftime('%d.%m.%Y')
+                         if self.calendarWidget.isVisible() else None)
         self.inner_change = True
         self.text.setText('')
         self.inner_change = False
-        editor_closed = self.handle_opened_editor()
-        if not editor_closed:  # Это может произойти только в случае, если объект - заметка
-            self.show_message('Название предыдущей заметки с открытым редактором заголовка занято',
-                              'Ошибка заметки')
-            return
-        self.status_bar.showMessage('')
-        title = 'Новая заметка' if self.active_section == 'notes' else 'Новая задача'
+        self.dialog = NoteAddDialog(self) if self.active_section == 'notes' else TaskAddDialog(self, deadline_date)
+        self.dialog.show()
+        # editor_closed = self.handle_opened_editor()
+        # if not editor_closed:  # Это может произойти только в случае, если объект - заметка
+        #     self.show_message('Название предыдущей заметки с открытым редактором заголовка занято',
+        #                       'Ошибка заметки')
+        #     return
+        # self.status_bar.showMessage('')
+        # title = 'Новая заметка' if self.active_section == 'notes' else 'Новая задача'
+        # self.listWidget.addItem(QtWidgets.QListWidgetItem(title))
+        # item = self.listWidget.item(self.listWidget.count() - 1)
+        # item.setText(title)
+        # self.listWidget.setFocus()
+        # if self.active_object:  # Указание на то, что текущая активная заметка после создания новой должна быть закрыта
+        #     self.active_object.change_open(False)
+        # item.setSelected(True)
+        # self.edit_object_title(item)
+
+    def proceed_adding_note(self, title: str, category: str):
         self.listWidget.addItem(QtWidgets.QListWidgetItem(title))
         item = self.listWidget.item(self.listWidget.count() - 1)
-        item.setText(title)
         self.listWidget.setFocus()
-        if self.active_object:  # Указание на то, что текущая активная заметка после создания новой должна быть закрыта
+        if self.active_object:
             self.active_object.change_open(False)
         item.setSelected(True)
-        self.edit_object_title(item)
+        note = Note(self.session, self.text, title, '', self.user.profile.id, dt.datetime.now())
+        self.notes.append(note)
+        self.session.add(note)
+        self.session.commit()
+        if not self.session.query(Category).filter(Category.name == category).first():
+            category = Category(name=category)
+            self.session.add(category)
+            self.session.commit()
+        else:
+            category = self.session.query(Category).filter(Category.name == category).first()
+        note.categories.append(category)
+        self.session.add(note)
+        self.session.commit()
+        self.active_object = self.notes[-1]
+        self.change_widgets('calendar -> field')
+        self.active_object.edit_title(title)
+        self.load_object(item)
+        self.repaint_calendar()
+
+    def proceed_adding_task(self, title: str, deadline: dt.datetime, category: str):
+        self.listWidget.addItem(QtWidgets.QListWidgetItem(title))
+        item = self.listWidget.item(self.listWidget.count() - 1)
+        self.listWidget.setFocus()
+        if self.active_object:
+            self.active_object.change_open(False)
+        item.setSelected(True)
+        task = Task(self.session, self.text, 'Новая задача', '', self.user.profile.id,
+                    dt.datetime.now(), deadline, False)
+        self.tasks.append(task)
+        self.session.add(task)
+        self.session.commit()
+        if not self.session.query(Category).filter(Category.name == category).first():
+            category = Category(name=category)
+            self.session.add(category)
+            self.session.commit()
+        else:
+            category = self.session.query(Category).filter(Category.name == category).first()
+        task.categories.append(category)
+        self.session.add(task)
+        self.active_object = self.tasks[-1]
+        self.change_widgets('calendar -> field')
+        self.active_object.edit_title(title)
+        self.load_object(item)
+        self.repaint_calendar()
 
     def edit_object_title(self, item: QtWidgets.QListWidgetItem) -> None:
         # Открывает редактор названия выделенного объекта
@@ -666,7 +756,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # Обработчик изменения размера окна
         size = event.size()
         x, y = size.width(), size.height()
-        self.listWidget.resize(int(x / 4.07), int(y / 1.2))
+        self.listWidget.resize(int(x / 4.07), int(y / 1.3))
+        self.search_field.resize(self.listWidget.width(), self.search_field.height())
         self.text.setStyleSheet('background-color:"#ffffff";border: 1px solid;border-radius: 3px;')
         widgets_to_adjust = [self.calendarWidget, self.text]
         for wdg in widgets_to_adjust:
@@ -708,7 +799,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             self.inner_change = True
             idx = self.listWidget.indexFromItem(item).row()
             title_is_available = (True if idx < len(section) and self.get_object(item).get_title()
-                                  == title or self.active_section == 'tasks'
+                                          == title or self.active_section == 'tasks'
                                   else self.check_title(title))
             try:
                 obj = self.get_object(item)
@@ -751,7 +842,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
 
 
 if __name__ == '__main__':
-    with open('db_data.txt', encoding='utf-8') as f:
+    with open(os.path.join('data', 'db_data.txt'), encoding='utf-8') as f:
         db_session.global_init(f.read().replace('\n', ' '))
     app = QtWidgets.QApplication(sys.argv)
     wnd = Window(db_session.create_session())

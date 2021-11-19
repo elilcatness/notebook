@@ -1,4 +1,5 @@
 import os
+
 from sqlalchemy import Column, Integer, String
 
 if os.getcwd().split('\\')[-1] != 'data':

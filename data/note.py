@@ -1,7 +1,8 @@
 import datetime as dt
 import os
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, orm, Table
+
 from PyQt5.QtWidgets import QTextEdit
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, orm, Table
 from sqlalchemy.orm import Session
 
 if os.getcwd().split('\\')[-1] != 'data':
@@ -10,7 +11,6 @@ if os.getcwd().split('\\')[-1] != 'data':
 else:
     from baseField import BaseField
     from db_session import DbBase
-
 
 category_to_note = Table('category_to_note', DbBase.metadata,
                          Column('category', Integer, ForeignKey('categories.id')),
