@@ -1,7 +1,7 @@
 from PyQt5.QtCore import QRect, QMetaObject, QCoreApplication
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (QWidget, QListWidget, QCalendarWidget, QMenuBar, QMenu, QAction,
-                             QToolButton, QStatusBar, QFontComboBox, QLineEdit)
+                             QToolButton, QStatusBar, QFontComboBox, QLineEdit, QPushButton)
 
 
 # class CalendarWidget(QCalendarWidget):
@@ -131,6 +131,11 @@ class Ui_MainWindow:  # No comments
         self.strike_out_tool.setText('ABC')
         self.strike_out_tool.resize(27, self.strike_out_tool.size().height())
         # self.strike_out_tool.setStyleSheet('color:"#ffffff"')
+
+        self.save_btn = QPushButton(self.centralwidget)
+        self.save_btn.setText('Сохранить')
+        self.save_btn.resize(125, 40)
+        self.save_btn.hide()
 
         self.shif_tools = [self.bold_tool, self.italic_tool,
                            self.underline_tool, self.overline_tool,

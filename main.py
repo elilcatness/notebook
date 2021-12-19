@@ -47,6 +47,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
         self.delete_task_action.triggered.connect(self.delete_object)  # Привязка сигнала к функции удаления задачи
         self.close_task_action.triggered.connect(self.close_task)  # Привязка сигнала к функции выполнения задачи
         self.save_action.triggered.connect(self.save_object)  # Привязка сигнала к функции сохранения объекта
+        self.save_btn.clicked.connect(self.save_object)
         self.insert_image_action.triggered.connect(self.insert_image)  # Привязка сигнала к функции вставки изображения
         self.show_all_action.triggered.connect(self.search)  # Привязка сигнала к функции отключения фильтра
         self.category_action.triggered.connect(self.handle_categories)
@@ -124,29 +125,6 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             section = self.notes if self.active_section == 'notes' else self.tasks
             if section:  # Дополнительная проверка для корректного отображения после изменения темы
                 self.listWidget.item(0).setSelected(True)
-
-    # def open_date_objects(self) -> None:  # Обработчик фильтрации списка объектов активной секции по выбранной дате
-    #     date = self.calendarWidget.selectedDate().toPyDate()
-    #     self.listWidget.clear()
-    #     if self.sender() == self.calendarWidget:  # Проверка на то, была ли вызвана функция путём нажатия на дату
-    #         self.load_objects(no_list=True)  # Вызов загрузки объектов для получения неотфильтрованных объектов,
-    #         # но без отображения оных в списке, так как дальше в функции идёт выборка
-    #         if self.active_section == 'notes':
-    #             self.notes = list(filter(lambda x: x.get_date_dt(with_time=False) == date, self.notes))
-    #             self.listWidget.addItems([x.get_title() for x in self.notes])
-    #         else:
-    #             self.tasks = list(filter(lambda x: x.get_deadline_dt(with_time=False) == date,
-    #                                      self.tasks))
-    #             self.listWidget.addItems([x.get_title() for x in self.tasks])
-    #             self.repaint_task_list()  # Вызов разметки выполненных и просроченных задач
-    #         self.search(self.search_field.text(), from_date_refresh=True)
-    #     else:
-    #         self.search_field.setText('')
-    #         show_tasks = False if self.active_section == 'notes' else True
-    #         self.load_objects(show_tasks=show_tasks)  # Здесь выбирается, что нужно отобразить именно задачи
-    #         section = self.notes if self.active_section == 'notes' else self.tasks
-    #         if section:  # Дополнительная проверка для корректного отображения после изменения темы
-    #             self.listWidget.item(0).setSelected(True)
 
     def handle_categories(self):  # Функция, позволяющая настраивать все категории
         self.category_form = CategoriesForm(self)
@@ -476,6 +454,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             for elem in self.shif_tools:
                 elem.show()
             self.text.show()
+            self.save_btn.show()
             # На данном этапе инициализируется прожатие инструментов, кои уже были применены до этого
             document = self.text.document()
             cursor = QtGui.QTextCursor(document)
@@ -500,6 +479,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
             obj.change_open(False)
             self.text.hide()
             self.hide_tools()
+            self.save_btn.hide()
             self.calendarWidget.show()
         clicked_item.setSelected(True)
         self.inner_change = False
@@ -533,6 +513,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
         try:
             obj = self.get_object(item)
             obj.save()
+            self.status_bar.showMessage('Изменения в %s были успешно сохранены.' % obj.title)
         except IndexError:
             field_name = 'Заметка' if self.active_section == 'notes' else 'Задача'
             self.show_message('%s ещё не была создана, нажмите Enter в названии заметки,'
@@ -607,21 +588,6 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
         self.inner_change = False
         self.dialog = NoteAddDialog(self) if self.active_section == 'notes' else TaskAddDialog(self, deadline_date)
         self.dialog.show()
-        # editor_closed = self.handle_opened_editor()
-        # if not editor_closed:  # Это может произойти только в случае, если объект - заметка
-        #     self.show_message('Название предыдущей заметки с открытым редактором заголовка занято',
-        #                       'Ошибка заметки')
-        #     return
-        # self.status_bar.showMessage('')
-        # title = 'Новая заметка' if self.active_section == 'notes' else 'Новая задача'
-        # self.listWidget.addItem(QtWidgets.QListWidgetItem(title))
-        # item = self.listWidget.item(self.listWidget.count() - 1)
-        # item.setText(title)
-        # self.listWidget.setFocus()
-        # if self.active_object:  # Указание на то, что текущая активная заметка после создания новой должна быть закрыта
-        #     self.active_object.change_open(False)
-        # item.setSelected(True)
-        # self.edit_object_title(item)
 
     def proceed_adding_note(self, title: str, category: str):
         self.listWidget.addItem(QtWidgets.QListWidgetItem(title))
@@ -752,6 +718,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, BaseApplicationForm, DateFunc
                                     + self.shif_tools[i - 1].size().width() + 4, pos_tool_y)
         self.combo_shift.move(self.strike_out_tool.pos().x() + self.strike_out_tool.size().width() + 4,
                               pos_tool_y)
+        self.save_btn.move(self.text.pos().x() + self.text.width() - self.save_btn.width(),
+                           self.text.pos().y() - self.save_btn.height() - 30)
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # Обработчик изменения размера окна
         size = event.size()
